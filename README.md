@@ -196,3 +196,5 @@ fct_orders (table)
 ## Lineage Diagram
 
 Visual representation of model dependencies:
+
+<img width="1101" height="270" alt="image" src="https://github.com/user-attachments/assets/d7d7d51e-0972-4ba9-ba4f-d28474f98f41" />
