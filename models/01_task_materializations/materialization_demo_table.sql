@@ -2,7 +2,7 @@
 
 with src as (
     select * 
-    from SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER
+    from {{source("tpch", "customer")}}
 ), 
 
 agg as (

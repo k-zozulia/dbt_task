@@ -15,7 +15,7 @@ with src as (
         o_clerk as clerk,
         o_shippriority as ship_priority,
         current_timestamp() as loaded_at
-    from SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS
+    from {{source("tpch", "orders")}}
 
     {% if is_incremental() %}
         where o_orderdate > (
