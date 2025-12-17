@@ -83,7 +83,7 @@ If queried 100 times:
 # Task 2: Incremental Orders Model
 
 ## Overview
-Incremental model that processes only new/updated records from TPCH ORDERS dataset, improving performance by ~80% compared to full refreshes.
+Incremental model that processes only new/updated records from TPCH ORDERS dataset.
 
 ## Configuration
 
@@ -147,3 +147,52 @@ Day 3: Order updated (status: 'shipped') ← Missed!
 | Full Refresh Weekly | Perfect | Slow | Simple |
 
 
+# Task 3: Ephemeral Models and Ref Chains
+
+## Overview
+This pipeline demonstrates ephemeral materialization in dbt, where intermediate transformations are compiled as CTEs rather than physical database objects.
+
+## Pipeline Architecture
+
+```
+orders (source)
+    ↓
+stg_orders (view)
+    ↓
+int_orders_with_status (ephemeral) 👻
+    ↓
+int_orders_enriched (ephemeral) 👻
+    ↓
+fct_orders (table)
+```
+
+**Key Point:** The two intermediate models don't exist in the database - they're inlined as CTEs in the final model's SQL.
+
+---
+
+## Benefits of Ephemeral Models
+
+| Benefit | Explanation |
+|---------|-------------|
+| **Clean Database** | No clutter from intermediate transformations |
+| **Modular Code** | Each model has single responsibility, easy to maintain |
+| **No Permission Issues** | Ephemeral models don't exist, so no access control needed |
+| **Single Query Execution** | All logic runs in one optimized query |
+| **Version Control Friendly** | Changes are self-contained in model files |
+
+---
+
+## Limitations of Ephemeral Models
+
+| Limitation | Impact | Mitigation |
+|------------|--------|------------|
+| **Can't query directly** | `SELECT * FROM int_orders_enriched` fails | Change to `view` for debugging |
+| **Code duplication** | If referenced by >1 model, CTE is duplicated | Use `view` for shared models |
+| **Harder debugging** | Can't inspect intermediate results | Temporarily materialize as view |
+| **Large CTE performance** | Complex ephemeral models may not optimize well | Use `table` for expensive transformations |
+
+---
+
+## Lineage Diagram
+
+Visual representation of model dependencies:
