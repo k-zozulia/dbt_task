@@ -1,0 +1,62 @@
+models:
+  - name: stg_tpch__orders
+    columns:
+      - name: order_key
+        tests:
+          - unique:
+              arguments:
+                severity: error
+          - not_null:
+              arguments:
+                severity: error
+      - name: order_status
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['O', 'F', 'P']
+                severity: error
+
+      - name: customer_key
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_tpch__customer')
+                field: customer_key
+                severity: error
+      
+      - name: total_price
+        tests:
+          - not_null:
+            arguments:
+              severity: warn
+      
+      - name: order_priority
+        description: "Priority level of the order"
+        tests:
+          - accepted_values:
+              arguments:
+                values: 
+                  - '1-URGENT'
+                  - '2-HIGH'
+                  - '3-MEDIUM'
+                  - '4-NOT SPECIFIED'
+                  - '5-LOW'
+                severity: warn
+
+  - name: stg_tpch__customer
+    columns:
+      - name: customer_key
+        tests:
+          - unique
+          - not_null
+  
+  - name: stg_tpch__lineitem
+    columns:
+      - name: order_key
+        tests:
+          - relationships:
+              arguments:
+                field: order_key
+                to: ref('stg_tpch__orders')
+                severity: error
+          

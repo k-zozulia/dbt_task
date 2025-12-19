@@ -13,4 +13,4 @@ select *,
         when order_priority in ('3-MEDIUM') then 'Medium Priority'
         else 'Low Priority'
     end as priority_level
-from {{ ref('int_orders_with_status')}}
+from {{ ref('int_tpch__orders_with_status')}}

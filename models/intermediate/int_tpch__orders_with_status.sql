@@ -14,4 +14,4 @@ select *,
         when order_status = 'P' then false
         else null
     end as is_completed
-from {{ ref('stg_orders') }}
+from {{ ref('stg_tpch__orders') }}
