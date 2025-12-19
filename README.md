@@ -198,3 +198,126 @@ fct_orders (table)
 Visual representation of model dependencies:
 
 <img width="1101" height="270" alt="image" src="https://github.com/user-attachments/assets/d7d7d51e-0972-4ba9-ba4f-d28474f98f41" />
+
+# Task 4: Built-in Schema Tests
+
+## Overview
+Comprehensive data quality framework using dbt's four built-in test types with severity levels based on business criticality.
+---
+## Test Configuration
+
+### 1. Unique Tests
+
+**Purpose:** Ensure no duplicate records exist for unique identifiers.
+
+```yaml
+# stg_tpch__orders.order_key (PK)
+- unique:
+    severity: error
+```
+
+**Why ERROR:** Duplicate primary keys indicate data corruption or ETL failures. This must block deployment.
+---
+### 2. Not Null Tests
+
+**Purpose:** Validate that required fields are populated.
+
+```yaml
+# stg_tpch__orders.order_key (PK)
+- not_null:
+    severity: error
+    
+# stg_tpch__orders.total_price (business field)
+- not_null:
+    severity: warn
+```
+
+**Why ERROR for PKs:** Missing primary keys break the entire data model.  
+**Why WARN for total_price:** Can be backfilled, doesn't break downstream models.
+---
+
+### 3. Accepted Values Tests
+
+**Purpose:** Ensure categorical fields contain only valid values.
+
+```yaml
+# stg_tpch__orders.order_status
+- accepted_values:
+    values: ['O', 'F', 'P']
+    severity: error
+    
+# stg_tpch__orders.order_priority
+- accepted_values:
+    values: ['1-URGENT', '2-HIGH', '3-MEDIUM', '4-NOT SPECIFIED', '5-LOW']
+    severity: warn
+```
+
+**Why ERROR for status:** Invalid status codes break order workflow logic.  
+**Why WARN for priority:** New priority levels may be added over time.
+
+---
+
+### 4. Relationships Tests (2)
+
+**Purpose:** Validate foreign key relationships and referential integrity.
+
+```yaml
+# stg_tpch__orders.customer_key → stg_tpch__customer.customer_key
+- relationships:
+    to: ref('stg_tpch__customer')
+    field: customer_key
+    severity: error
+
+# stg_tpch__lineitem.order_key → stg_tpch__orders.order_key
+- relationships:
+    to: ref('stg_tpch__orders')
+    field: order_key
+    severity: error
+```
+
+**Why ERROR:** Orphan records (orders without customers, lineitems without orders) indicate broken data integrity.
+---
+## Severity Strategy
+
+### 🛑 ERROR Severity (Blocks Deployment)
+
+**Criteria:** Data corruption, broken business logic, or referential integrity violations.
+
+| Test | Model | Column | Reason |
+|------|-------|--------|--------|
+| unique | stg_tpch__orders | order_key | Duplicate PKs = data corruption |
+| not_null | stg_tpch__orders | order_key | Missing PKs = broken system |
+| unique | stg_tpch__customer | customer_key | Duplicate PKs = data corruption |
+| not_null | stg_tpch__customer | customer_key | Missing PKs = broken system |
+| accepted_values | stg_tpch__orders | order_status | Invalid status breaks workflows |
+| relationships | stg_tpch__orders | customer_key | Orphan orders = integrity failure |
+| relationships | stg_tpch__lineitem | order_key | Orphan lineitems = integrity failure |
+
+**Action on Failure:**
+```
+ - BLOCK deployment
+ - Alert data team immediately
+ - Investigate root cause
+ - Fix data issues before retry
+```
+
+---
+
+### ⚠️ WARN Severity (Generates Alerts)
+
+**Criteria:** Data quality issues that need investigation but don't break core functionality.
+
+| Test | Model | Column | Reason |
+|------|-------|--------|--------|
+| not_null | stg_tpch__orders | total_price | Can be backfilled, not critical for queries |
+| accepted_values | stg_tpch__orders | order_priority | New priority levels may be added |
+
+**Action on Failure:**
+```
+ - ALLOW deployment to proceed
+ - Log failure to monitoring dashboard
+ - Create ticket for investigation
+ - Notify data team (non-urgent)
+```
+
+---

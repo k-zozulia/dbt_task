@@ -37,6 +37,6 @@ clean-targets:         # directories to be removed by `dbt clean`
 
 models:
   dbt_task:
-    # Applies to all files under models/example/
-    example:
-      +materialized: table
+    staging:
+      tpch:
+       +materialized: view

@@ -21,4 +21,4 @@ select
     end as fulfillment_status,
 
     current_timestamp() as processed_at
-from {{ ref('int_orders_enriched') }}
+from {{ ref('int_tpch__orders_enriched') }}
