@@ -321,3 +321,85 @@ Comprehensive data quality framework using dbt's four built-in test types with s
 ```
 
 ---
+
+# Task 5: Custom Singular Tests
+
+## Overview
+Custom SQL-based tests that validate complex business logic which cannot be expressed using dbt's generic tests.
+
+---
+
+## Test 1: Order-LineItem Status Consistency
+
+**File:** `tests/assert_fulfilled_orders_have_no_open_lines.sql`
+
+**Business Rule:** Fulfilled orders (status 'F') should not contain open line items (status 'O').
+
+**Logic:**
+- Identifies orders marked as 'F' (Fulfilled)
+- Checks if any line items still have 'O' (Open) status
+- Returns violations where fulfillment status is inconsistent
+
+**Result:** ✅ **PASS** - All fulfilled orders have properly closed line items.
+
+---
+
+## Test 2: Order Total Reconciliation
+
+**File:** `tests/assert_order_totals_match.sql`
+
+**Business Rule:** Order `total_price` must match the sum of line item calculations: `SUM(extended_price × (1 - discount) × (1 + tax))`.
+
+**Tolerance:** 1% difference allowed for rounding
+
+**Logic:**
+- Calculates expected total from line items
+- Compares with stored `total_price` in orders table
+- Flags discrepancies > 1% or missing line items
+
+**Result:** ✅ **PASS** - All order totals reconcile within tolerance.
+
+---
+
+## Test 3: Date Logic Validation ⚠️
+
+**File:** `tests/assert_lineitem_dates_logical.sql`
+
+**Business Rule:** Dates must follow chronological order: `commit_date ≤ ship_date ≤ receipt_date`.
+
+**Logic:**
+- Validates date sequences for all line items
+- Identifies violations:
+  - Receipt before commit
+  - Ship before commit  
+  - Receipt before ship
+
+**Result:** ⚠️ **WARN** - Found **2,926,558 violations**
+### Violation Breakdown
+
+The test identified line items where dates don't follow logical order. Common scenarios include:
+
+- **Ship before commit:** Items shipped before committed delivery date (possible rush orders)
+- **Receipt before ship:** Receipt date earlier than ship date (data entry errors or timezone issues)
+- **Receipt before commit:** Items received before original commitment (expedited shipping)
+
+### Severity Configuration
+```sql
+{{ config(severity='warn') }}
+```
+
+**Why WARN?** 
+- Date inconsistencies indicate data quality issues but don't break downstream analytics
+- May reflect legitimate business scenarios (rush orders, date corrections)
+- Requires investigation but shouldn't block deployments
+
+---
+
+## Why Singular Tests?
+
+These business rules **cannot** be expressed using generic tests because they:
+- Compare aggregations across tables (order totals)
+- Validate multi-column relationships (date sequences)
+- Check cross-table status consistency (orders vs line items)
+
+Singular tests provide the flexibility to encode complex domain logic directly in SQL.
