@@ -27,8 +27,8 @@ models:
       - name: total_price
         tests:
           - not_null:
-            arguments:
-              severity: warn
+              arguments:
+                severity: warn
       
       - name: order_priority
         description: "Priority level of the order"
