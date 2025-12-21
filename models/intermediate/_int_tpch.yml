@@ -1,0 +1,18 @@
+models:
+  - name: int_tpch__orders_with_status
+    description: "Enriches orders with human-readable status categories and completion flags"
+    columns:
+      - name: status_category
+        description: "Human-readable order status (Open, Fulfilled, Partial, Unknown)"
+      
+      - name: is_completed
+        description: "Boolean flag indicating if order is fully completed"
+
+  - name: int_tpch__orders_enriched
+    description: "Adds business classifications for order size and priority levels"
+    columns:
+      - name: order_size
+        description: "Order value classification: Small (<50k), Medium (50-150k), Large (150-300k), Very Large (>300k)"
+      
+      - name: priority_level
+        description: "Simplified priority grouping: High Priority, Medium Priority, Low Priority"

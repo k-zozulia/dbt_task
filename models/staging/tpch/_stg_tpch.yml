@@ -1,7 +1,9 @@
 models:
   - name: stg_tpch__orders
+    description: "{{ doc('tpch_source') }} Staging model for orders with basic transformations and column renaming."
     columns:
       - name: order_key
+        description: "{{ doc('order_key') }}"
         tests:
           - unique:
               arguments:
@@ -15,6 +17,7 @@ models:
                 severity: error
       
       - name: clerk
+        description: "Clerk ID who processed the order"
         tests:
           # Clerk ID should be exactly 15 characters
           - string_length_bounds:
@@ -24,6 +27,7 @@ models:
                 severity: error
 
       - name: order_status
+        description: "{{ doc('order_status') }}"
         tests:
           - accepted_values:
               arguments:
@@ -38,6 +42,7 @@ models:
                 severity: error
 
       - name: customer_key
+        description: "{{ doc('customer_key') }}"
         tests:
           - relationships:
               arguments:
@@ -46,13 +51,17 @@ models:
                 severity: error
       
       - name: total_price
+        description: "{{ doc('total_price') }}"
         tests:
           - not_null:
               arguments:
                 severity: warn
       
+      - name: order_date
+        description: "Date when the order was placed"
+      
       - name: order_priority
-        description: "Priority level of the order"
+        description: "Business priority level assigned to the order"
         tests:
           - accepted_values:
               arguments:
@@ -64,9 +73,14 @@ models:
                   - '5-LOW'
                 severity: warn
 
+      - name: ship_priority
+        description: "Shipping priority indicator"
+
   - name: stg_tpch__customer
+    description: "{{ doc('tpch_source') }} Staging model for customer dimension data."
     columns:
       - name: customer_key
+        description: "{{ doc('customer_key') }}"
         tests:
           - unique
           - not_null
@@ -76,6 +90,7 @@ models:
                 severity: error
       
       - name: nation_key
+        description: "Foreign key to nation dimension"
         tests:
           # Nation key should be in range 0-24
           - values_in_range:
@@ -83,8 +98,18 @@ models:
                 min_value: 0
                 max_value: 24
                 severity: error
+
+      - name: customer_name
+        description: "Full name of the customer"
+
+      - name: account_balance
+        description: "Current account balance in USD"
+      
+      - name: market_segment
+        description: "Customer market segment classification"
       
       - name: phone
+        description: "Customer contact phone number in standardized format"
         tests:
           # Phone numbers should be exactly 15 characters (standardized format)
           - string_length_bounds:
@@ -94,8 +119,10 @@ models:
                 severity: error
   
   - name: stg_tpch__lineitem
+    description: "{{ doc('tpch_source') }} Staging model for order line items with product and shipping details."
     columns:
       - name: order_key
+        description: "{{ doc('order_key') }}"
         tests:
           - relationships:
               arguments:
@@ -104,8 +131,8 @@ models:
                 severity: error
 
       - name: discount
+        description: "Discount percentage applied (0.00 to 0.10)"
         tests:
-          # Discounts should be 0-10%
           - values_in_range:
               arguments:
                 min_value: 0
@@ -113,10 +140,29 @@ models:
                 severity: error
       
       - name: extended_price
+        description: "Line item price before discounts and taxes"
         tests:
           # Prices should be positive
           - values_in_range:
               arguments:
                 min_value: 0.01
                 severity: error
+      
+      - name: line_number
+        description: "Line item number within the order"
+
+      - name: tax
+        description: "Tax rate applied to the line item"
+      
+      - name: line_status
+        description: "Status of this specific line item (O=Open, F=Fulfilled)"
+      
+      - name: ship_date
+        description: "Date when the item was shipped"
+      
+      - name: commit_date
+        description: "Committed delivery date"
+      
+      - name: receipt_date
+        description: "Actual receipt date by customer"
           
