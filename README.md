@@ -403,3 +403,99 @@ These business rules **cannot** be expressed using generic tests because they:
 - Check cross-table status consistency (orders vs line items)
 
 Singular tests provide the flexibility to encode complex domain logic directly in SQL.
+---
+
+# Task 6: Custom Generic Tests (Macros)
+
+## Overview
+Reusable generic test macros that validate data quality rules across multiple models and columns.
+
+---
+
+## Macro 1: `test_values_in_range`
+
+**Purpose:** Validates that numeric column values fall within specified minimum and maximum bounds.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `model` | ref | Yes | - | Model being tested |
+| `column_name` | string | Yes | - | Numeric column to validate |
+| `min_value` | numeric | No | none | Minimum acceptable value (inclusive) |
+| `max_value` | numeric | No | none | Maximum acceptable value (inclusive) |
+
+### Usage Examples
+```yaml
+# Ensure primary keys are positive
+- name: order_key
+  tests:
+    - values_in_range:
+        min_value: 1
+        severity: error
+
+# Validate discount percentage (0-10%)
+- name: discount
+  tests:
+    - values_in_range:
+        min_value: 0
+        max_value: 0.10
+        severity: error
+
+# Check nation_key range (TPCH has 25 nations: 0-24)
+- name: nation_key
+  tests:
+    - values_in_range:
+        min_value: 0
+        max_value: 24
+        severity: error
+```
+
+## Macro 2: `test_string_length_bounds`
+
+**Purpose:** Validates that string lengths fall within acceptable character count bounds.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `model` | ref | Yes | - | Model being tested |
+| `column_name` | string | Yes | - | String column to validate |
+| `min_length` | integer | No | none | Minimum string length |
+| `max_length` | integer | No | none | Maximum string length |
+
+### Usage Examples
+```yaml
+# Validate exact length (standardized IDs)
+- name: clerk
+  tests:
+    - string_length_bounds:
+        min_length: 15
+        max_length: 15
+        severity: error
+
+# Ensure single-character codes
+- name: order_status
+  tests:
+    - string_length_bounds:
+        min_length: 1
+        max_length: 1
+        severity: error
+
+# Validate phone number format
+- name: phone
+  tests:
+    - string_length_bounds:
+        min_length: 15
+        max_length: 15
+        severity: error
+```
+---
+## Use Cases
+
+| Test | Best For |
+|------|----------|
+| `values_in_range` | Primary keys, percentages, monetary amounts, quantities, age ranges |
+| `string_length_bounds` | Standardized IDs, status codes, phone numbers, postal codes, SKUs |
+
+Both tests return detailed information about violations, making debugging straightforward.

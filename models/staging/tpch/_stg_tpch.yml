@@ -9,11 +9,32 @@ models:
           - not_null:
               arguments:
                 severity: error
+          - values_in_range:
+              arguments:
+                min_value: 1
+                severity: error
+      
+      - name: clerk
+        tests:
+          # Clerk ID should be exactly 15 characters
+          - string_length_bounds:
+              arguments: 
+                min_length: 15
+                max_length: 15
+                severity: error
+
       - name: order_status
         tests:
           - accepted_values:
               arguments:
                 values: ['O', 'F', 'P']
+                severity: error
+          
+          # Status should be single character
+          - string_length_bounds:
+              arguments: 
+                min_length: 1
+                max_length: 1
                 severity: error
 
       - name: customer_key
@@ -49,6 +70,28 @@ models:
         tests:
           - unique
           - not_null
+          - values_in_range:
+              arguments:
+                min_value: 1
+                severity: error
+      
+      - name: nation_key
+        tests:
+          # Nation key should be in range 0-24
+          - values_in_range:
+              arguments:
+                min_value: 0
+                max_value: 24
+                severity: error
+      
+      - name: phone
+        tests:
+          # Phone numbers should be exactly 15 characters (standardized format)
+          - string_length_bounds:
+              arguments:
+                min_length: 15
+                max_length: 15
+                severity: error
   
   - name: stg_tpch__lineitem
     columns:
@@ -58,5 +101,22 @@ models:
               arguments:
                 field: order_key
                 to: ref('stg_tpch__orders')
+                severity: error
+
+      - name: discount
+        tests:
+          # Discounts should be 0-10%
+          - values_in_range:
+              arguments:
+                min_value: 0
+                max_value: 0.10
+                severity: error
+      
+      - name: extended_price
+        tests:
+          # Prices should be positive
+          - values_in_range:
+              arguments:
+                min_value: 0.01
                 severity: error
           
