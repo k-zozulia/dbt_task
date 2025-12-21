@@ -499,3 +499,22 @@ Reusable generic test macros that validate data quality rules across multiple mo
 | `string_length_bounds` | Standardized IDs, status codes, phone numbers, postal codes, SKUs |
 
 Both tests return detailed information about violations, making debugging straightforward.
+---
+# Task 7: Model and Column Documentation
+
+## Documentation Strategy
+
+### Reusable Doc Blocks
+Created standardized descriptions in `models/docs.md` for:
+- Common keys (order_key, customer_key)
+- Order status codes
+- Data source context (TPC-H)
+
+### Coverage
+- **Staging models:** 3 models, 20+ columns documented
+- **Intermediate models:** 2 models with business logic explained
+- **Mart models:** 1 production table with full context
+
+### Key Features
+- All tests visible in column documentation
+- Business context provided for derived fields

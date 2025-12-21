@@ -1,0 +1,33 @@
+models:
+  - name: fct_tpch__orders
+    description: "{{ doc('fct_orders_model') }}"
+    columns:
+      - name: order_key
+        description: "{{ doc('order_key') }}"
+      
+      - name: customer_key
+        description: "{{ doc('customer_key') }}"
+      
+      - name: order_date
+        description: "Date when the order was placed"
+      
+      - name: total_price
+        description: "{{ doc('total_price') }}"
+      
+      - name: status_category
+        description: "Human-readable order status"
+      
+      - name: is_completed
+        description: "Boolean flag for completed orders"
+      
+      - name: order_size
+        description: "Business classification of order value"
+      
+      - name: priority_level
+        description: "Simplified priority grouping"
+      
+      - name: fulfillment_status
+        description: "{{ doc('fulfillment_status') }}"
+      
+      - name: processed_at
+        description: "Timestamp when this record was processed by dbt"
