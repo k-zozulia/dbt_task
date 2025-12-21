@@ -518,3 +518,6 @@ Created standardized descriptions in `models/docs.md` for:
 ### Key Features
 - All tests visible in column documentation
 - Business context provided for derived fields
+- Lineage Graph
+<img width="1370" height="447" alt="image" src="https://github.com/user-attachments/assets/66cd0229-1467-469f-a0db-eba3444b561c" />
+
