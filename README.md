@@ -1,6 +1,6 @@
-## Task 1: View vs Table Materialization
+# Task 1: View vs Table Materialization
 
-### Overview
+## Overview
 This demo compares **view** and **table** materializations in dbt using Snowflake's sample dataset (150k customer records).
 
 ### Model: `models/materialization_demo.sql`
