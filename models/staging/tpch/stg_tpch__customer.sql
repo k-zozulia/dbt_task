@@ -1,13 +1,8 @@
-with 
-
-source as (
-
-    select * from {{ source('tpch', 'customer') }}
-
+with source as (
+    select * from {{ source('tpch_demo', 'customer_with_loaded_at') }}
 ),
 
 renamed as (
-
     select
         c_custkey    as customer_key,
         c_name       as customer_name,
@@ -17,9 +12,7 @@ renamed as (
         c_acctbal    as account_balance,
         c_mktsegment as market_segment,
         c_comment    as comment
-
     from source
-
 )
 
 select * from renamed

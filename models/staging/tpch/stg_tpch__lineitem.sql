@@ -1,11 +1,8 @@
 with source as (
-
-    select * from {{ source('tpch', 'lineitem') }}
-
+    select * from {{ source('tpch_demo', 'lineitem_with_loaded_at') }}
 ),
 
 renamed as (
-
     select
         l_orderkey       as order_key,
         l_partkey        as part_key,
@@ -23,9 +20,7 @@ renamed as (
         l_shipinstruct   as ship_instructions,
         l_shipmode       as ship_mode,
         l_comment        as comment
-
     from source
-
 )
 
 select * from renamed

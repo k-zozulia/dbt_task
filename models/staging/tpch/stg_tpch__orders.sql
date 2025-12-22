@@ -1,4 +1,4 @@
-{{ config( materialized='view') }}
+{{ config(materialized='view') }}
 
 select 
     o_orderkey      as order_key,
@@ -10,4 +10,4 @@ select
     o_clerk         as clerk,
     o_shippriority  as ship_priority
     
-from {{source("tpch", "orders")}}
+from {{ source("tpch_demo", "orders_with_loaded_at") }}
