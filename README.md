@@ -520,4 +520,72 @@ Created standardized descriptions in `models/docs.md` for:
 - Business context provided for derived fields
 - Lineage Graph
 <img width="1370" height="447" alt="image" src="https://github.com/user-attachments/assets/66cd0229-1467-469f-a0db-eba3444b561c" />
+---
 
+# Task 8: Source Freshness Checks
+
+## Overview
+Configured data freshness monitoring for source tables to ensure timely data delivery and catch ETL pipeline failures early.
+
+---
+
+## Challenge: TPC-H Dataset Limitations
+
+The TPC-H sample dataset has two constraints:
+1. **Date fields are `DATE` type** (dbt freshness requires `TIMESTAMP`)
+2. **No audit columns** like `_loaded_at` exist (static historical data)
+
+### Solution: Created Views with Timestamp Fields
+
+```sql
+-- Created in Snowflake (DBT_DB.Transform schema)
+CREATE OR REPLACE VIEW orders_with_loaded_at AS
+SELECT *, CAST(o_orderdate AS TIMESTAMP) AS _loaded_at
+FROM snowflake_sample_data.tpch_sf1.orders;
+
+CREATE OR REPLACE VIEW lineitem_with_loaded_at AS
+SELECT *, CAST(l_shipdate AS TIMESTAMP) AS _loaded_at
+FROM snowflake_sample_data.tpch_sf1.lineitem;
+
+CREATE OR REPLACE VIEW customer_with_loaded_at AS
+SELECT *, CURRENT_TIMESTAMP() AS _loaded_at
+FROM snowflake_sample_data.tpch_sf1.customer;
+```
+---
+## Freshness Configuration
+
+| Source | Loaded At Field | Warn After | Error After | Rationale |
+|--------|----------------|------------|-------------|-----------|
+| orders_with_loaded_at | _loaded_at (o_orderdate) | 12 hours | 1 day | Orders should arrive daily |
+| lineitem_with_loaded_at | _loaded_at (l_shipdate) | 12 hours | 1 day | Line items updated with orders |
+| customer_with_loaded_at | _loaded_at (current_ts) | 1 day | 3 days | Customer data changes less frequently |
+
+---
+
+## Expected Results
+
+⚠️ Since TPC-H is static historical data, freshness checks will show **ERROR** status (data is years old). This is expected behavior for this demo.
+
+In production with real ETL pipelines:
+- **PASS** = Data loaded within expected timeframe
+- **WARN** = Data delayed but acceptable
+- **ERROR** = Data pipeline issue, investigate immediately
+
+---
+
+## Monitoring Workflow
+
+1. **Pre-deployment check:**
+```bash
+   dbt source freshness && dbt run && dbt test
+```
+
+2. **Scheduled monitoring:**
+   - Run freshness checks every 6 hours
+   - Alert on ERROR to Slack/PagerDuty
+   - Log WARN to monitoring dashboard
+
+3. **Integration:**
+   - Add to CI/CD pipeline
+   - Block deployments on ERROR status
+   - Dashboard: Track freshness trends over time

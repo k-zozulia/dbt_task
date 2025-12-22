@@ -2,13 +2,43 @@ version: 2
 
 sources:
   - name: tpch
-    description: "{{ doc('tpch_source') }}"
+    description: "{{ doc('tpch_source') }} - Original TPC-H tables"
     database: snowflake_sample_data
     schema: tpch_sf1
+    
     tables:
       - name: orders
         description: "Raw orders data"
+      
       - name: customer
         description: "Raw customer data"
+      
       - name: lineitem
         description: "Raw line item data"
+
+  - name: tpch_demo
+    description: "Demo sources with timestamp fields for freshness monitoring"
+    database: "{{ target.database }}"
+    schema: "{{ target.schema }}"
+    
+    tables:
+      - name: orders_with_loaded_at
+        description: "Orders with timestamp field for freshness checks"
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: {count:  12, period: hour}
+          error_after: {count: 1, period: day}
+      
+      - name: lineitem_with_loaded_at
+        description: "Line items with timestamp field for freshness checks"
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: {count:  12, period: hour}
+          error_after: {count: 1, period: day}
+      
+      - name: customer_with_loaded_at
+        description: "Customers with timestamp field for freshness checks"
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: {count: 1, period: day}
+          error_after: {count: 3, period: day}
