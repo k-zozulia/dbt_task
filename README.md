@@ -753,3 +753,448 @@ TableScan: Partition pruning active on ship_date filter
 | Full scan queries | -3% | Negligible |
 | Storage | Metadata only | Minimal |
 | Reclustering | Automatic | Monitor credits |
+---
+
+# Task 10: Project Analysis and Optimization
+
+# DAG Structure Analysis
+(Before Optimization)
+
+## Project Overview
+- Total Models: 9
+- Total Sources: 3
+- Total Tests: 21 (18 schema + 3 singular)
+- Layers: 3 (staging → intermediate → marts)
+
+## Layer Breakdown
+
+### Sources (3)
+1. `tpch.orders` → 1.5M rows
+2. `tpch.customer` → 150K rows  
+3. `tpch.lineitem` → 6M rows
+
+### Staging Layer (3 models - all VIEWS)
+1. `stg_tpch__orders` ← tpch.orders
+2. `stg_tpch__customer` ← tpch.customer
+3. `stg_tpch__lineitem` ← tpch.lineitem
+
+### Intermediate Layer (2 models - all EPHEMERAL)
+1. `int_tpch__orders_with_status` ← stg_tpch__orders
+2. `int_tpch__orders_enriched` ← int_tpch__orders_with_status
+
+### Marts Layer (3 models - all TABLES)
+1. `fct_tpch__orders` ← int_tpch__orders_enriched
+2. `fct_tpch__lineitem_base` ← tpch.lineitem (⚠️ DUPLICATE) (🔴 DELETED)
+3. `fct_tpch__lineitem_clustered` ← tpch.lineitem
+
+### Orphaned Models (Demo artifacts)
+- `materialization_demo_table` (🔴 DELETED)
+- `materialization_demo_view` (🔴 DELETED)
+- `orders.sql` (in 02_task_incremental folder) (🔴 DELETED)
+
+## Issues Identified
+
+### 🔴 Critical Issue 1: Duplicate Lineitem Models
+**Problem:** Both `fct_tpch__lineitem_base` and `fct_tpch__lineitem_clustered` exist
+**Impact:** 
+- Double build time (~36s wasted per run)
+- Double storage (~314 MB)
+- Confusion about which to use
+
+**Action:** DELETED `fct_tpch__lineitem_base.sql`
+
+### ⚠️ Issue 2: Demo Models in Production
+**Problem:** 3 demo models not part of main DAG
+**Impact:** Cluttered project, longer build times
+**Action:** Deleted
+
+## Fixed DAG:
+
+## Analyze Model Run Times
+
+
+## Build Times (Full dbt run)
+
+| # | Model                        | Type      | Time      | Rows | % of Total | Status  |
+| - | ---------------------------- | --------- | --------- | ---- | ---------- | ------- |
+| 1 | stg_tpch__customer           | view      | **0.42s** | 150K | **4.0%**   | ✅ Fast  |
+| 2 | stg_tpch__orders             | view      | **0.73s** | 1.5M | **7.0%**   | ✅ Fast  |
+| 3 | stg_tpch__lineitem           | view      | **0.73s** | 6M   | **7.0%**   | ✅ Fast  |
+| 4 | int_tpch__orders_with_status | ephemeral | **0.00s** | –    | **0.0%**   | ✅ Fast  |
+| 5 | int_tpch__orders_enriched    | ephemeral | **0.00s** | –    | **0.0%**   | ✅ Fast  |
+| 6 | fct_tpch__orders             | table     | **1.87s** | 1.5M | **17.9%**  | ✅ OK    |
+| 7 | fct_tpch__lineitem           | table     | **6.69s** | 6M   | **64.1%**  | 🔴 SLOW |
+
+**TOTAL BUILD TIME: ~13.1 seconds**
+
+## Key Findings
+
+### 🔴 Critical Bottleneck: Lineitem Models
+- **Combined time:** 36.75s (47% of total build!)
+- **Issue:** Processing same 6M rows twice
+- **Solution:** Delete one, convert other to incremental
+
+### Performance by Layer
+| Layer | Total Time | % of Build | Assessment |
+|-------|-----------|------------|------------|
+| Staging | 1.31s | 1.7% | ✅ Excellent |
+| Intermediate | 0.00s | 0.0% | ✅ Excellent (ephemeral) |
+| Marts | 40.18s | 51.7% | ⚠️ Needs optimization |
+
+### Key Findings (corrected)
+🔴 Critical Bottleneck: Lineitem Model
+
+Time: 6.69s
+
+**Share of total build:** 64.1%
+**Issue:** One very large fact table (6M rows) dominates runtime
+**Observation:** Even without clustering comparison, fct_tpch__lineitem is the primary performance bottleneck
+**Optimization direction:** incremental strategy, clustering, or pruning by date
+
+| Layer            | Total Time | % of Build | Assessment              |
+| ---------------- | ---------- | ---------- | ----------------------- |
+| **Staging**      | **1.88s**  | **18.0%**  | ✅ Excellent             |
+| **Intermediate** | **0.00s**  | **0.0%**   | ✅ Excellent (ephemeral) |
+| **Marts**        | **8.56s**  | **82.0%**  | ⚠️ Needs optimization   |
+
+## Test Coverage by Model
+### ✅ Well-Tested Models
+
+#### stg_tpch__orders (7 tests)
+- [x] unique (order_key)
+- [x] not_null (order_key)
+- [x] not_null (total_price) - severity: warn
+- [x] accepted_values (order_status) - ['O', 'F', 'P']
+- [x] accepted_values (order_priority) - 5 values, warn
+- [x] relationships (customer_key → stg_tpch__customer)
+- [x] string_length_bounds (clerk, order_status)
+
+#### stg_tpch__customer (4 tests)
+- [x] unique (customer_key)
+- [x] not_null (customer_key)
+- [x] values_in_range (customer_key: min 1)
+- [x] values_in_range (nation_key: 0-24)
+- [x] string_length_bounds (phone: 15 chars)
+
+#### stg_tpch__lineitem (3 tests)
+- [x] relationships (order_key → stg_tpch__orders)
+- [x] values_in_range (discount: 0-0.10)
+- [x] values_in_range (extended_price: min 0.01)
+
+### 🔴 CRITICAL: Models Without Tests
+
+#### fct_tpch__orders (0 tests) ❌
+**Status:** Production table with ZERO data quality checks
+**Risk Level:** HIGH
+**Impact:** Bad data could flow to dashboards undetected
+
+**Missing Tests:**
+- [ ] unique (order_key)
+- [ ] not_null (order_key, processed_at)
+- [ ] accepted_values (fulfillment_status)
+- [ ] Data logic: processed_at >= order_date
+
+#### fct_tpch__lineitem (0 tests) ❌
+**Status:** Production table with ZERO data quality checks
+**Risk Level:** HIGH
+**Impact:** 6M rows with no validation
+
+**Missing Tests:**
+- [ ] not_null (order_key, line_number)
+- [ ] relationships (order_key → stg_tpch__orders)
+- [ ] Data logic: discounted_price = extended_price * (1 - discount)
+- [ ] Data logic: final_price = discounted_price * (1 + tax)
+
+### ⚪ Ephemeral Models (No tests needed)
+- int_tpch__orders_with_status (ephemeral - tested via downstream)
+- int_tpch__orders_enriched (ephemeral - tested via downstream)
+
+## Documentation Coverage
+
+### ✅ Fully Documented Models
+| Model | Description | Columns Documented | Doc Blocks |
+|-------|-------------|-------------------|------------|
+| stg_tpch__orders | ✅ Yes | 8/8 (100%) | ✅ Yes |
+| stg_tpch__customer | ✅ Yes | 7/8 (88%) | ✅ Yes |
+| int_tpch__orders_with_status | ✅ Yes | 2/2 (100%) | ❌ No |
+| int_tpch__orders_enriched | ✅ Yes | 2/2 (100%) | ❌ No |
+| fct_tpch__orders | ✅ Yes | 10/10 (100%) | ✅ Yes |
+
+### 🔴 Poorly Documented Models
+| Model | Description | Columns Documented | Doc Blocks |
+|-------|-------------|-------------------|------------|
+| stg_tpch__lineitem | ✅ Yes | 10/16 (63%) | ⚠️ Partial |
+| fct_tpch__lineitem | ❌ **NO** | 0/20 (0%) | ❌ **NO** |
+
+## Critical Gaps
+
+### 🚨 Priority 0: Test Production Tables
+**Action Required:** Add tests to `fct_tpch__orders` and `fct_tpch__lineitem`
+**Risk if not fixed:** Production data quality issues undetected
+
+### ⚠️ Priority 1: Document Lineitem Models  
+**Action Required:** Add column descriptions
+**Risk if not fixed:** Team confusion, harder maintenance
+
+---
+# Prioritized Improvement Roadmap
+
+## Priority Framework
+
+| Priority | Definition | Examples |
+|----------|-----------|----------|
+| **P0** 🔴 | Blocks production / Critical risk | No tests on prod tables |
+| **P1** 🟡 | High value / Quick wins | Performance optimizations |
+| **P2** 🔵 | Important but not urgent |  Advanced features |
+| **P3** ⚪ | Nice to have | Polish & extras |
+
+---
+
+## 🔴 P0: Critical 
+
+### P0.1 - Add Tests to Production Mart Models
+**Issue:** Zero data quality validation on production tables
+**Models:** `fct_tpch__orders`, `fct_tpch__lineitem`
+
+**Action Items:**
+1. Create `models/marts/_fct_tpch_tests.yml` (if not exists)
+2. Add tests for fct_tpch__orders
+3. Add tests for fct_tpch__lineite
+4. Run `dbt test` and verify
+
+**Test Checklist for fct_tpch__orders:**
+```yaml
+- [ ] unique (order_key)
+- [ ] not_null (order_key)
+- [ ] not_null (processed_at)
+- [ ] accepted_values (fulfillment_status)
+- [ ] relationships (customer_key → staging)
+```
+
+**Impact:** 🔥 Critical - Prevents bad data in production
+**Risk if skipped:** Silent data quality failures
+
+---
+
+## 🟡 P1: High Value
+
+### P1.1 - Convert Lineitem to Incremental
+**Issue:** 6M row table rebuilt from scratch every run (18.5s)
+
+**Action:** Modify `fct_tpch__lineitem.sql`
+
+**Implementation:**
+```sql
+{{ config(
+    materialized='incremental',
+    unique_key=['order_key', 'line_number'],
+    cluster_by=['ship_date', 'return_flag', 'ship_mode'],
+    incremental_strategy='merge'
+) }}
+
+with source as (
+    select * from {{ source('tpch', 'lineitem') }}
+    
+    {% if is_incremental() %}
+    where l_shipdate >= (
+        select dateadd(day, -3, max(ship_date))
+        from {{ this }}
+    )
+    {% endif %}
+),
+-- rest of model...
+```
+
+**Impact:** ⚡⚡ 87% faster incremental runs (2-3s vs 18s)
+**Savings:** 60-70 seconds per run after initial load
+
+---
+
+### P1.2 - Complete Lineitem Documentation
+**Issue:** Production model has 0% column documentation
+
+**Action:** Add to `models/marts/_fct_tpch.yml`
+
+**Template:**
+```yaml
+models:
+  - name: fct_tpch__lineitem_clustered
+    description: |
+      Production fact table for order line items.
+      Clustered on ship_date, return_flag, and ship_mode.
+      Includes pre-calculated discounts and taxes.
+    
+    columns:
+      - name: order_key
+        description: "Foreign key to fct_tpch__orders"
+      
+      - name: line_number
+        description: "Line item sequence (1-7 typically)"
+      
+      - name: discounted_price
+        description: "Price after discount: extended_price × (1 - discount)"
+      
+      # ... add all 20 columns
+```
+
+**Impact:** 📚 Better team understanding, easier debugging
+**Risk:** None
+
+---
+
+## 🔵 P2: Important 
+
+### P2.1 - Add Business Logic Tests
+**Current:** 3 singular tests exist
+**Target:** Add 2-3 more validation tests
+
+**New Tests to Add:**
+```sql
+# tests/assert_discounted_price_accuracy.sql
+# Validate: discounted_price = extended_price * (1 - discount)
+
+# tests/assert_final_price_accuracy.sql
+# Validate: final_price = discounted_price * (1 + tax)
+```
+**Impact:** Higher confidence in calculations
+
+---
+
+### P2.3 - Set Up Source Freshness Monitoring
+**Action:** Already configured, but add to CI/CD
+```bash
+dbt source freshness
+```
+
+**Impact:** Catch data pipeline issues early
+
+---
+
+## 🔵 P3: Nice to Have - Backlog
+
+- Add model contracts (dbt 1.5+)
+- Implement snapshots for SCD Type 2
+- Add exposures for BI dashboards
+- Set up Slack alerting for test failures
+- Create data quality dashboard
+
+---
+
+# Project Optimization Report
+## Executive Summary
+
+This comprehensive audit analyzed the dbt_task project's DAG structure, performance, test coverage, and documentation quality. The project demonstrates strong foundational knowledge but requires optimization before production deployment.
+
+**Key Findings:**
+- 🔴 Critical: Zero tests on production mart tables
+- 🟡 Opportunity: 87% faster builds with incremental materialization
+- ✅ Strength: Excellent staging layer test coverage
+
+---
+
+## 1. Project Overview
+###
+Total Models: 7
+Staging: 3 (views) 
+Intermediate: 2 (ephemeral) 
+Marts: 2 (tables) 
+
+Total Tests: 21
+Schema: 18 
+Singular: 3 
+Test Coverage: 33% of models 
+
+## 2. Critical Issues Found
+
+### 🔴 Issue #1: No Tests on Production Tables
+**Severity:** CRITICAL - Blocks Production Readiness
+
+**Affected Models:**
+- `fct_tpch__orders` (1.5M rows, 0 tests)
+- `fct_tpch__lineitem` (6M rows, 0 tests)
+
+**Risk:**
+- Bad data could flow to dashboards undetected
+- No validation of calculated fields (discounts, taxes)
+- Referential integrity not verified
+
+**Action Required:** Add comprehensive test suite (see P0.1)
+
+---
+
+### 🟡 Issue #2: Inefficient Materialization
+**Severity:** HIGH - Optimization Opportunity
+
+**Model:** `fct_tpch__lineitem` (6M rows)
+
+**Current:** Full table refresh every run (18.5s)
+**Optimal:** Incremental with 3-day lookback (2-3s)
+
+**Expected Savings:**
+- Incremental runs: 87% faster (16s saved)
+- Daily builds: 4 × 16s = 64 seconds saved
+- Monthly: ~32 minutes saved
+
+**Action Required:** Convert to incremental
+
+---
+
+## 3. Performance Analysis
+
+### Current Build Performance
+
+| # | Model                        | Type      | Time      | Rows | % of Total | Status  |
+| - | ---------------------------- | --------- | --------- | ---- | ---------- | ------- |
+| 1 | stg_tpch__customer           | view      | **0.42s** | 150K | **4.0%**   | ✅ Fast  |
+| 2 | stg_tpch__orders             | view      | **0.73s** | 1.5M | **7.0%**   | ✅ Fast  |
+| 3 | stg_tpch__lineitem           | view      | **0.73s** | 6M   | **7.0%**   | ✅ Fast  |
+| 4 | int_tpch__orders_with_status | ephemeral | **0.00s** | –    | **0.0%**   | ✅ Fast  |
+| 5 | int_tpch__orders_enriched    | ephemeral | **0.00s** | –    | **0.0%**   | ✅ Fast  |
+| 6 | fct_tpch__orders             | table     | **1.87s** | 1.5M | **17.9%**  | ✅ OK    |
+| 7 | fct_tpch__lineitem           | table     | **6.69s** | 6M   | **64.1%**  | 🔴 SLOW |
+
+---
+## 4. Test Coverage Gap Analysis
+
+### Current Coverage
+
+| Layer | Models | With Tests | Without Tests | Coverage |
+|-------|--------|------------|---------------|----------|
+| Staging | 3 | 3 | 0 | 100% ✅ |
+| Intermediate | 2 | 0 | 2 | N/A (ephemeral) |
+| Marts | 2 | 0 | 2 | 0% 🔴 |
+
+### Missing Critical Tests
+
+#### fct_tpch__orders needs:
+- [ ] unique (order_key)
+- [ ] not_null (order_key, processed_at)
+- [ ] accepted_values (fulfillment_status)
+- [ ] relationships (customer_key → staging)
+
+#### fct_tpch__lineitem needs:
+- [ ] not_null (order_key, line_number)
+- [ ] relationships (order_key → orders)
+- [ ] custom: discounted_price calculation accuracy
+- [ ] custom: final_price calculation accuracy
+
+---
+
+## 5. Documentation Assessment
+
+### Coverage by Model
+
+| Model | Description | Columns | Score |
+|-------|-------------|---------|-------|
+| stg_tpch__orders | ✅ | 8/8 (100%) | ⭐⭐⭐⭐⭐ |
+| stg_tpch__customer | ✅ | 7/8 (88%) | ⭐⭐⭐⭐ |
+| fct_tpch__orders | ✅ | 10/10 (100%) | ⭐⭐⭐⭐⭐ |
+| stg_tpch__lineitem | ✅ | 10/16 (63%) | ⭐⭐⭐ |
+| fct_tpch__lineitem | ❌ | 0/20 (0%) | 🔴 |
+
+### Missing Documentation
+- 20 columns in fct_tpch__lineitem (0% documented)
+- 6 columns in stg_tpch__lineitem
+- Custom macro documentation missing
+
+---

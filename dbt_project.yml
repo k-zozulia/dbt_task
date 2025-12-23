@@ -37,6 +37,16 @@ clean-targets:         # directories to be removed by `dbt clean`
 
 models:
   dbt_task:
+    +materialized: view 
+    
     staging:
-      tpch:
-       +materialized: view
+      +materialized: view
+      +tags: ["staging"]
+    
+    intermediate:
+      +materialized: ephemeral
+      +tags: ["intermediate"]
+    
+    marts:
+      +materialized: table
+      +tags: ["marts", "production"]
