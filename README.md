@@ -1,6 +1,7 @@
-#Project Overview
+# Project Overview
 
 This project is a hands-on dbt and Snowflake training project focused on building and optimizing data transformations using best practices. It covers environment setup, GitHub-based development workflows, and multiple transformation tasks. The goal of the project is to understand how dbt models behave in practice and how design choices impact performance, maintainability, and scalability.
+
 ---
 # Branching Strategy
 
