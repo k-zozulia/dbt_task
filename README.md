@@ -1,3 +1,24 @@
+#Project Overview
+
+This project is a hands-on dbt and Snowflake training project focused on building and optimizing data transformations using best practices. It covers environment setup, GitHub-based development workflows, and multiple transformation tasks. The goal of the project is to understand how dbt models behave in practice and how design choices impact performance, maintainability, and scalability.
+---
+# Branching Strategy
+
+Each task in this project was developed in its own dedicated Git branch.
+This approach allowed changes to be implemented, tested, and reviewed independently for each task.
+
+The main branch contains the final consolidated version of the project, where:
+
+- All completed tasks are merged
+
+- Redundant or overlapping models created during earlier tasks were removed
+
+- Several optimizations were applied to simplify the overall structure and improve performance
+
+Additionally, the main branch includes the complete README documentation, covering all tasks and their outcomes in a single, unified place.
+
+---
+
 # Task 1: View vs Table Materialization
 
 ## Overview
@@ -809,6 +830,9 @@ TableScan: Partition pruning active on ship_date filter
 **Action:** Deleted
 
 ## Fixed DAG:
+
+<img width="1364" height="380" alt="image" src="https://github.com/user-attachments/assets/af3fe06d-ff1f-4286-ab60-7da3438b7389" />
+
 
 ## Analyze Model Run Times
 
